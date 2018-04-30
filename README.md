@@ -1,4 +1,4 @@
-# Product Name
+# Otus HW #1
 > First homework for otus python courses
 
 ## Installation
