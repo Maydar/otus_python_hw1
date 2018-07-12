@@ -2,18 +2,10 @@ import ast
 import os
 import collections
 
+import nltk
 from nltk import pos_tag
 
-
-FREQUENCY_OF_WORDS = 200
-PROJECT_LIST = [
-    'django',
-    'flask',
-    'pyramid',
-    'reddit',
-    'requests',
-    'sqlalchemy',
-]
+nltk.download('averaged_perceptron_tagger')
 
 
 def flat(list_object):
@@ -22,30 +14,27 @@ def flat(list_object):
 
 
 def is_verb(word):
+    verb_tags = ['VB', 'VBZ', 'VBN', 'VBG', 'VBD', 'VBP']
     if not word:
         return False
     pos_info = pos_tag([word])
-    return pos_info[0][1] == 'VB'
+    verb_tag = pos_info[0][1]
+    return verb_tag in verb_tags
 
 
-def extract_python_files_from_path(os, path, max_length=100):
-    files = []
+def extract_python_files_from_path(os, path):
+    file_names = []
     for dir_name, dirs, files in os.walk(path, topdown=True):
         for file in files:
-            if not file.endswith('.py'):
-                continue
+            if file.endswith('.py'):
+                file_path = os.path.join(dir_name, file)
+                file_names.append(file_path)
 
-            if len(files) > max_length:
-                break
-
-            file_path = os.path.join(dir_name, file)
-            files.append(file_path)
-
-    files_count = len(files)
+    files_count = len(file_names)
 
     print('total {} files'.format(files_count))
 
-    return files, files_count
+    return file_names, files_count
 
 
 def generate_trees(files, with_file_names=False, with_file_content=False):
@@ -90,11 +79,18 @@ def get_lowercase_function_names(trees):
             if isinstance(node, ast.FunctionDef):
                 lowercase_node_names.append(node.name.lower())
 
-    return flat(lowercase_node_names)
+    return lowercase_node_names
 
 
-def get_all_function_names_from_tree(tree):
-    return [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
+def get_all_names_from_tree(trees):
+    function_names = []
+
+    for tree in trees:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                function_names.append(node.id)
+
+    return function_names
 
 
 def filter_doubleslash_names(function_names):
@@ -126,16 +122,16 @@ def split_snake_case_name_to_words(name):
 
 
 def extract_all_words(trees):
-    function_names = get_function_names(trees,
-                                        extractor_function=get_all_function_names_from_tree)
+    names = get_function_names(trees,
+                               extractor_function=get_all_names_from_tree)
 
-    formatted_function_names = []
+    formatted_names = []
 
-    for function_name in function_names:
-        formatted_function_name = split_snake_case_name_to_words(function_name)
-        formatted_function_names.append(formatted_function_name)
+    for name in names:
+        formatted_name = split_snake_case_name_to_words(name)
+        formatted_names.append(formatted_name)
 
-    return flat(formatted_function_names)
+    return flat(formatted_names)
 
 
 def extract_most_frequent_verbs(trees, frequency=10):
@@ -159,32 +155,67 @@ def extract_most_frequent_functions_names(trees, frequency=10):
     return collections.Counter(function_names).most_common(frequency)
 
 
-def get_mostly_used_verbs_from_projects(os, project_list, extractor_function):
-    words = []
+def get_word_counts(os, project_list, extractor_function):
+    word_counts = []
     for project in project_list:
         path = os.path.join('.', project)
         trees = get_trees(path)
-        words += extractor_function(trees)
-    return words
+        word_counts += extractor_function(trees)
+
+    for word_count in word_counts:
+        print(word_count[0], word_count[1])
 
 
-if __name__ == "__main__":
-    mostly_used_words = get_mostly_used_verbs_from_projects(
-        os=os,
-        project_list=PROJECT_LIST,
-        extractor_function=extract_most_frequent_verbs
-    )
-    total_count_of_words = len(mostly_used_words)
-    unique_words = set(mostly_used_words)
+def get_all_words_statistics(os, project_list):
+    words = []
+
+    for project in project_list:
+        path = os.path.join('.', project)
+        trees = get_trees(path)
+        words += extract_all_words(trees)
+
+    total_count_of_words = len(words)
+    unique_words = set(words)
+    count_of_unique_words = len(unique_words)
 
     total_count_output = 'total count of words: {} '.format(total_count_of_words)
-    unique_count_output = 'count of unique words {}'.format(unique_words)
+    unique_count_output = 'count of unique words {}'.format(count_of_unique_words)
 
-    print(total_count_of_words)
+    print(total_count_output)
     print(unique_count_output)
 
-    word_counter = collections.Counter(mostly_used_words)
-    mostly_used_words_in_range = word_counter.most_common(FREQUENCY_OF_WORDS)
+    word_counter = collections.Counter(words)
+    mostly_used_words_in_range = word_counter.most_common(words_frequency)
 
     for word, occurrence in mostly_used_words_in_range:
         print(word, occurrence)
+
+
+if __name__ == "__main__":
+
+    words_frequency = 200
+    projects = [
+        'django',
+        'flask',
+        'pyramid',
+        'reddit',
+        'requests',
+        'sqlalchemy',
+    ]
+
+    get_word_counts(
+        os=os,
+        project_list=projects,
+        extractor_function=extract_most_frequent_verbs
+    )
+
+    get_word_counts(
+        os=os,
+        project_list=projects,
+        extractor_function=extract_most_frequent_functions_names
+    )
+
+    get_all_words_statistics(
+        os=os,
+        project_list=projects
+    )
