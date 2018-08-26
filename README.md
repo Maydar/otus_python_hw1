@@ -19,7 +19,23 @@ Install dependencies from requirements.txt
 ```
 Run Example
 ```
-   python calculate_words_count.py
+   cd src
+   python print_all_words_count.py
+```
+
+## Example output
+```
+total 2493 files in path ../django
+trees generated
+setup 331
+setuptestdata 166
+teardown 117
+as_sql 96
+render 66
+deconstruct 65
+get_queryset 56
+to_python 55
+...
 ```
 
 ## Hints
